@@ -125,12 +125,10 @@ if __name__ == "__main__":
     SearchToDo = True
     while SearchToDo:
         list_length_start = len(include_list)
-    #    print(list_length_start)
         for item in include_list:
             subincludes, father_file_path = scan_for_includes(item, father_file_path)
             include_list.extend(subincludes)
             include_list = list(filter(None, include_list))
-    #        print(include_list)
             list_length_end = len(include_list)
 
         include_list = list(set(include_list))
@@ -138,7 +136,6 @@ if __name__ == "__main__":
         length_diff = list_length_end - list_length_start
         diff = str(length_diff)
         ii = str(i)
-    #    print(list_length_end)
         i = i+1
         print(diff+' more includes found in sublevel '+ii)
         if length_diff == 0:
