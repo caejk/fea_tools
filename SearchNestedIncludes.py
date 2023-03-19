@@ -7,12 +7,12 @@ import time
 import shutil
 import platform
 
-# ---------- Determine Linux or Windows -----------
+# ---------- Determine if Linux or Windows -----------
 ForwardSlash = '/'      # Linux eg. /path/file..
 BackSlash = (chr(92))   # Windows eg. \path\file..
 SlashList = [ForwardSlash, BackSlash]
 Sys = platform.system()
-if Sys == 'Linux': # Sets the Slash variable according to OS
+if Sys == 'Linux':       # Curreently "/" is set for both systems
     Slash = ForwardSlash
 if Sys == 'Windows':
     Slash = ForwardSlash
@@ -120,6 +120,7 @@ if __name__ == "__main__":
     [x.encode('utf-8') for x in include_list]
     [os.path.abspath(x) for x in include_list]
 
+# ---------- If a nested file is found in a file it will be added to the search list until no more nested files are found  -----------
     subincludes = []
     i = 1
     SearchToDo = True
@@ -144,14 +145,16 @@ if __name__ == "__main__":
 
     include_list = list(set(include_list))
     include_list.sort()
-
+    
+# ---------- Terminal output of the search results -----------
     print(*include_list, sep = '\n')
 
     elapsed = time.time() - t
     elapsed = round(elapsed, 2)
     print("\nDone. Time elapsed: " + str(elapsed) + " seconds")
     print("")
-
+    
+# ---------- Copy the files (optional) -----------
     copy_files(include_list)
 
 
