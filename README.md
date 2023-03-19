@@ -7,5 +7,5 @@ SearchNestedIncludes.py
   - This version is made for the LS-Dyna solver which uses the keyword "\*INCLUDE" to import FEA files(includes).
   - The script is to be called with the main solver input deck as an argument.
   - The script produces terminal output with absolute paths to all found includes.
-  - The user can choose whether he wishes to copy all found files to a specified directory.
+  - The user can choose whether he wishes to copy all found files to a specific directory.
   - Currently bugs may occur if a file is referenced by a relative path.
