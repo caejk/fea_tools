@@ -42,17 +42,9 @@ def user_input():
 def scan_for_includes(inp, father_file_path):
     BadChars = ['$']
     InpNoDollar = []
-    Includes = []
-    PlusOrInclude = ['+', 'INCLUDE']
     PlusEnd = ' +\n'
-    IncWithPlus = []
-    list_of_lists = []
-    include_as_list = []
-    clean_include_as_list = []
     include_list = []
-#    father_file_path = os.getcwd()
 
-    pwd = os.getcwd()
     if not any(char in inp for char in SlashList):
         inp = father_file_path+Slash+inp
 
@@ -83,8 +75,6 @@ def scan_for_includes(inp, father_file_path):
                 clean_include_as_list.append(item)
             clean_include = ''.join(clean_include_as_list)
 
-#            if Slash not in clean_include:
-#                clean_include = father_file_path+Slash+clean_include
             if not any(char in inp for char in SlashList):
                 clean_include = father_file_path + Slash + clean_include
 
@@ -117,33 +107,21 @@ def copy_files(include_list):
     else:
          sys.exit()
 
-# ---------- Run the search -----------
+# ---------- Run -----------
 if __name__ == "__main__":
     t = time.time()
-#    inp, father_file_path, input_itself = user_input()
-    inp = r'E:\Jan\Software\Scripts\fea\Test_Folder\Run001\input.inp.txt'
+    inp, father_file_path, input_itself = user_input()
     input_itself = inp
-    #print(inp)
     father_file_path = os.path.dirname(os.path.abspath(inp))
-    print(father_file_path)
 
-    #inp, father_file_path, input_itself = user_input()
     include_list, father_file_path = scan_for_includes(inp, father_file_path)
     include_list.sort()
-    #for item in include_list:
-    #    item = os.path.abspath(item)
-    #    print(item)
-
-    #print(*include_list, sep = '\n')
 
     [x.encode('utf-8') for x in include_list]
     [os.path.abspath(x) for x in include_list]
-#    print(*include_list, sep='\n')
-#    print(father_file_path)
 
     subincludes = []
     i = 1
-
     SearchToDo = True
     while SearchToDo:
         list_length_start = len(include_list)
@@ -166,8 +144,6 @@ if __name__ == "__main__":
         if length_diff == 0:
             SearchToDo = False
             break
-
-    #lprint('----------------------------')
 
     include_list = list(set(include_list))
     include_list.sort()
