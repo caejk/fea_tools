@@ -1,5 +1,7 @@
 # fea_tools
-Useful scripts for pre- and post-processing of FEA simulations
+Useful scripts for pre- and post-processing of FEA simulations will be shared here.
+
+SearchNestedIncludes.py:
 
 Large FEA projects often have simulation solver input decks referencing files which are referencing other files and so on.
 
