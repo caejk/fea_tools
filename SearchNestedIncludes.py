@@ -50,37 +50,46 @@ def scan_for_includes(inp, father_file_path):
 
     inp_path = os.path.dirname(inp)
     father_file_path = inp_path
+    try:
+        with open(inp, 'r', encoding='utf-8', errors='ignore') as file:   # remove LS-Dyna comments
+            for line in file:
+                if not any(bad_char in line for bad_char in BadChars):
+                    InpNoDollar.append(line)
 
-    with open(inp, 'r', encoding='utf-8', errors='ignore') as file:   # remove LS-Dyna comments
-        for line in file:
-            if not any(bad_char in line for bad_char in BadChars):
-                InpNoDollar.append(line)
+        for i, line in enumerate(InpNoDollar):
+            include_as_list = []
+            clean_include_as_list = []
 
-    for i, line in enumerate(InpNoDollar):
-        include_as_list = []
-        clean_include_as_list = []
-
-        if line.startswith('*INCLUDE'):
-            j = i+1
-            include_as_list.append(InpNoDollar[j])
-            while InpNoDollar[j].endswith(PlusEnd):
-                j += 1
+            if line.startswith('*INCLUDE'):
+                j = i+1
                 include_as_list.append(InpNoDollar[j])
+                while InpNoDollar[j].endswith(PlusEnd):
+                    j += 1
+                    include_as_list.append(InpNoDollar[j])
 
-            for item in include_as_list:
-                if item.endswith(PlusEnd):
-                    item = re.sub(' \+\n', '', item)
-                else:
-                    item = re.sub('\n', '', item)
-                clean_include_as_list.append(item)
-            clean_include = ''.join(clean_include_as_list)
+                for item in include_as_list:
+                    if item.endswith(PlusEnd):
+                        item = re.sub(' \+\n', '', item)
+                    else:
+                        item = re.sub('\n', '', item)
+                    clean_include_as_list.append(item)
+                clean_include = ''.join(clean_include_as_list)
 
-            if not any(char in inp for char in SlashList):
-                clean_include = father_file_path + Slash + clean_include
+                if not any(char in inp for char in SlashList):
+                    clean_include = father_file_path + Slash + clean_include
 
-            include_list.append(clean_include)
+                include_list.append(clean_include)
+    except Exception a x:
+        if x.errno == 2:
+            Includes_not_exist.append(inp)
+        #            print(inp, TRED +'does not exist'+ TWHITE)
+        elif x.errno == 13:
+            Includes_cannot_read.append(inp)
+        #            print(inp, TORANGE +'cannot be read'+ TWHITE)
+        else:
+            print(inp, '- some other error')
 
-    return include_list, father_file_path
+    return include_list, father_file_path, Includes_not_exist, Includes_cannot_read
 
 # ---------- Copy Includes to folder given by user -----------
 def copy_files(include_list):
