@@ -44,6 +44,8 @@ def scan_for_includes(inp, father_file_path):
     InpNoDollar = []
     PlusEnd = ' +\n'
     include_list = []
+    Includes_cannot_read = []
+    Includes_not_exist = []
 
     if not any(char in inp for char in SlashList):
         inp = father_file_path+Slash+inp
@@ -79,7 +81,7 @@ def scan_for_includes(inp, father_file_path):
                     clean_include = father_file_path + Slash + clean_include
 
                 include_list.append(clean_include)
-    except Exception a x:
+    except Exception as x:
         if x.errno == 2:
             Includes_not_exist.append(inp)
         #            print(inp, TRED +'does not exist'+ TWHITE)
