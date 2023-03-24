@@ -8,4 +8,9 @@ SearchNestedIncludes.py
   - The script is to be called with the main solver input deck as an argument.
   - The script produces terminal output with absolute paths to all found includes.
   - The user can choose whether he wishes to copy all found files to a specific directory.
-  - Currently bugs may occur if a file is referenced by a relative path.
+  
+Excel2Impact.py
+  - This script will help you in comparing your FEA simulation with real world crash test.
+  - The impact points from a real world crash test are usually documented in an Excel.
+  - This script produces Animator session file that will create impact points from the coordinates saved in the Excel.
+  - Additional information and a "how to" inside the script file.
