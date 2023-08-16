@@ -6,6 +6,8 @@ import re
 import time
 import shutil
 import platform
+import argparse
+from datetime import datetime
 
 # ---------- Determine if Linux or Windows -----------
 ForwardSlash = '/'      # Linux eg. /path/file..
@@ -25,19 +27,34 @@ TORANGE = '\033[33m'
 
 # ---------- User Input -----------
 def user_input():
-    if sys.argv[1:]:
-        inp = sys.argv[1]
-        input_raw = inp
+    argParser = argparse.ArgumentParser()
+    argParser.add_argument("-s", "--search", dest='str_search', help="Enter string to search")
+    argParser.add_argument("-i", "--input", dest='input_deck', help="Enter input deck to scan")
+    args = argParser.parse_args()
+#    print(args.input_deck)
+#    print(args)
+#    if sys.argv[1:]:
+#        inp = sys.argv[-1]
+#        print(inp)
+#        input_raw = inp
+    if args:
+        inp = args.input_deck
+        input_raw = args.input_deck
+
     else:
         print("")
         print("Enter an input deck to scan")
         sys.exit()
+        
+    if args.str_search:
+        print('Searching for the term '+'\033[1m'+args.str_search+'\033[0m'+' in '+args.input_deck)
+    elif args.input_deck:
+        print('Scanning Includes in '+'\033[1m'+inp+'\033[0m')
 
-    print('Scanning Includes in '+inp)
     father_file = os.path.abspath(inp)
     father_file_path = os.path.dirname(os.path.abspath(inp))
     inp_and_father = inp, father_file                               # inp and inp itself with full path as his own father so the search function works
-    return inp_and_father
+    return inp_and_father, args
 
 # ---------- Define search function -----------
 def scan_for_includes(inp_and_father, Includes_not_exist, Includes_cannot_read):   # inp_and_father is a tuple of file and its father file
@@ -114,7 +131,7 @@ def recur(include_list, Includes_not_exist, Includes_cannot_read, include_list_t
         return recur(subinclude_list_all, Includes_not_exist, Includes_cannot_read, include_list_total)
 
 # ---------- Define short include name function -----------
-def shortname(include_list):                                 # list of tuples (child, father)
+def shortname(include_list):                                 # list of tuples
     include_list_short= []
     for x in include_list:
         inc_as_list = x[0].split("/")
@@ -125,6 +142,21 @@ def shortname(include_list):                                 # list of tuples (c
         include_list_short.append(include_and_father_file_short)
     return include_list_short
 
+# ---------- Get file timestamp -----------
+def get_timestamp(inc):
+    try:
+        IncTimeStamp = os.path.getmtime(inc) + 3600
+        IncDate = datetime.utcfromtimestamp(IncTimeStamp).strftime('%Y-%m-%d %H:%M')
+        return IncDate
+    except OSError as e:
+        if e.errno == 2:
+            IncDate = 'file does not exist'
+        elif e.errno == 13:
+            IncDate = 'file cannot be read'
+        else:
+            IncDate = 'file error'
+        return IncDate
+        
 # ---------- List missing includes -----------
 def list_missing_files(Includes_not_exist, Includes_cannot_read):
     nr_notfound = str(len(Includes_not_exist))
@@ -133,6 +165,7 @@ def list_missing_files(Includes_not_exist, Includes_cannot_read):
 
     if len(Includes_not_exist) > 0:
         print(TRED +'Warning: '+nr_notfound+' referenced Includes does not exist: '+TWHITE)
+#        print(*Includes_not_exist, sep = '\n')
         [print('Include: '+f'{x[0]:<40}'+' referenced in: '+x[1]) for x in Includes_not_exist]
         print("")
 
@@ -176,7 +209,7 @@ def copy_files(include_list):
     else:
          sys.exit()
 
-# ---------- Print tree structure -----------    
+# ---------- Create Include Dictionary -----------    
 def get_dict_parent_children(ListOfTuples):
     IncDict = {}
     Parents = list(set([x[1] for x in ListOfTuples]))
@@ -187,17 +220,22 @@ def get_dict_parent_children(ListOfTuples):
                 ChildList.append(y[0])
         IncDict[p] = ChildList
     return IncDict
-
+  
+# ---------- Print tree structure ----------- 
 def print_tree(root, IncDict, level=0):
-    print("   "*level, root)
+    rootDate = get_timestamp(root)
+    SpaceLength = 150 - 3*level - len(root)
+    print("   "*level, root, " "*SpaceLength, rootDate)
     subs = IncDict[root]
     subs.sort(key=lambda x: x[0])
     for s in subs:
         if s in IncDict:
             print_tree(s, IncDict, level + 1)
         else:
+            sDate = get_timestamp(s)
             lvl = level + 1
-            print("   "*lvl, s)
+            SpaceLength = 150 - 3*lvl - len(s)
+            print("   "*lvl, s, " "*SpaceLength, sDate)
 # ---------- User input for tree structure -----------        
 def user_choose_long_or_short_tree(inp, include_list_total, include_list_total_short):
     if len(include_list_total) < 1:
@@ -223,20 +261,36 @@ def user_choose_long_or_short_tree(inp, include_list_total, include_list_total_s
         user_choose_long_or_short_tree(inp, include_list_total, include_list_total_short)
     else:
         pass    
-
+# ---------- Search for a string in Includes -----------
+def string_search(args, include_list_total):
+    if args.str_search:
+        str2search = args.str_search
+        simple_include_list_raw = []
+        for item in include_list_total:
+            simple_include_list_raw.append(item[0])
+            simple_include_list_raw.append(item[1])
+        simple_include_list = list(set(simple_include_list_raw))
+        for item in simple_include_list:
+            command = 'grep --color --with-filename '+str2search+' '+item
+            os.system(command)
+        sys.exit()
+    else:
+        pass
 # ---------- Run -----------
 if __name__ == "__main__":
     t = time.time()
-    inp = user_input()
+    inp, args = user_input()
     include_list = [inp]
     include_list_total = []
     Includes_cannot_read = []
     Includes_not_exist = []
     include_list_total = recur(include_list, Includes_not_exist, Includes_cannot_read, include_list_total)  
     include_list_total.sort(key=lambda x: x[0])
+    string_search(args, include_list_total)
 # ---------- Terminal output: print the found nested files -----------
-    print('Final list:')
+#    print('Final list:')
     include_list_total_short = shortname(include_list_total)
+#    [print('Include: '+f'{x[0]:<60}'+' referenced in: '+x[1]) for x in include_list_total]
     elapsed = time.time() - t
     elapsed = round(elapsed, 2)
     print("\nDone. Time elapsed: " + str(elapsed) + " seconds")
