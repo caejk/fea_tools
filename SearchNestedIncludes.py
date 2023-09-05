@@ -7,6 +7,7 @@ import time
 import shutil
 import platform
 import argparse
+import tempfile
 from datetime import datetime
 
 # ---------- Determine if Linux or Windows -----------
@@ -30,15 +31,12 @@ def user_input():
     argParser = argparse.ArgumentParser()
     argParser.add_argument("-s", "--search", dest='str_search', help="Enter string to search")
     argParser.add_argument("-i", "--input", dest='input_deck', help="Enter input deck to scan")
+    argParser.add_argument("-c", "--compare", dest='compare_deck', help="Enter input deck to compare")
     args = argParser.parse_args()
-#    print(args.input_deck)
-#    print(args)
-#    if sys.argv[1:]:
-#        inp = sys.argv[-1]
-#        print(inp)
-#        input_raw = inp
     if args:
         inp = args.input_deck
+        inp1 = args.input_deck
+        inp2 = args.compare_deck
         input_raw = args.input_deck
 
     else:
@@ -48,18 +46,28 @@ def user_input():
         
     if args.str_search:
         print('Searching for the term '+'\033[1m'+args.str_search+'\033[0m'+' in '+args.input_deck)
+    elif args.compare_deck:
+        inp2tuple = inp2, inp2
+        inp2tuple_list = [inp2tuple]
+        inp2short = shortname(inp2tuple_list)
+#        print(inp2short)
+        print('Comparing Includes in '+'\033[1m'+inp+'\033[0m and '+'\033[1m'+inp2short[0][0]+'\033[0m')
     elif args.input_deck:
         print('Scanning Includes in '+'\033[1m'+inp+'\033[0m')
-
+    inp1tuple = inp1, inp1
+    inp1tuple_list = [inp1tuple]
+    inp1short = shortname(inp1tuple_list)
+    inp1s = inp1short[0][0]
     father_file = os.path.abspath(inp)
     father_file_path = os.path.dirname(os.path.abspath(inp))
-    inp_and_father = inp, father_file                               # inp and inp itself with full path as his own father so the search function works
+    inp_and_father = inp1s, father_file                               # inp and inp itself with full path as his own father in order for the search function to work
     return inp_and_father, args
 
-# ---------- Define search function -----------
+# ---------- Define include search function -----------
 def scan_for_includes(inp_and_father, Includes_not_exist, Includes_cannot_read):   # inp_and_father is a tuple of file and its father file
     BadChars = ['$']
     PlusEnd = ' +\n'
+    SpacePlus = ' +'
     InpNoDollar = []
     include_list = []
     ForwardSlash = '/'      # Linux eg. /path/file..
@@ -83,9 +91,14 @@ def scan_for_includes(inp_and_father, Includes_not_exist, Includes_cannot_read):
                 clean_include_as_list = []
                 if line.startswith('*INCLUDE'):
                     NextLine = next(InpFile)
+                    NextLine = NextLine.strip()
+                    NextLine = NextLine+'\n'
+#                    [x.strip() for x in row]
                     include_as_list.append(NextLine)
                     while NextLine.endswith(PlusEnd) or NextLine.startswith('$'):
                         NextLine = next(InpFile)
+                        NextLine = NextLine.strip()
+                        NextLine = NextLine+'\n'
                         include_as_list.append(NextLine)
 
                     for item in include_as_list:
@@ -124,9 +137,9 @@ def recur(include_list, Includes_not_exist, Includes_cannot_read, include_list_t
         subinclude_list_all.extend(subinclude_list)
         include_list_total.extend(subinclude_list)
     if len(subinclude_list_all) == 0:
-        print('Search finished')
+        print('Scanning complete')
         include_list_total.sort(key=lambda x: x[0])
-        return include_list_total
+        return Includes_not_exist, Includes_cannot_read, include_list_total
     else:
         return recur(subinclude_list_all, Includes_not_exist, Includes_cannot_read, include_list_total)
 
@@ -177,6 +190,7 @@ def list_missing_files(Includes_not_exist, Includes_cannot_read):
 
     if (len(Includes_not_exist) + len(Includes_cannot_read)) == 0:
         print(TGREEN +'All includes accesible! '+TWHITE)
+        print('')
 
     elif (len(Includes_not_exist) + len(Includes_cannot_read)) > 0:
         if len(Includes_not_exist) > 0:
@@ -222,22 +236,58 @@ def get_dict_parent_children(ListOfTuples):
     return IncDict
   
 # ---------- Print tree structure ----------- 
-def print_tree(root, IncDict, level=0):
+def print_tree(root, IncDict, tree_list, level=0):
     rootDate = get_timestamp(root)
     SpaceLength = 150 - 3*level - len(root)
     print("   "*level, root, " "*SpaceLength, rootDate)
     subs = IncDict[root]
     subs.sort(key=lambda x: x[0])
+    trunk = '   ' * level
+    trunk = trunk+root
+    tree_list.append(trunk)
     for s in subs:
         if s in IncDict:
-            print_tree(s, IncDict, level + 1)
+            print_tree(s, IncDict, tree_list, level + 1)
         else:
             sDate = get_timestamp(s)
             lvl = level + 1
             SpaceLength = 150 - 3*lvl - len(s)
+            branch = '   ' * lvl
+            branch = branch+s
+            tree_list.append(branch)
             print("   "*lvl, s, " "*SpaceLength, sDate)
-# ---------- User input for tree structure -----------        
-def user_choose_long_or_short_tree(inp, include_list_total, include_list_total_short):
+    return tree_list
+
+# ---------- Print tree structure into list----------- 
+def print_tree_to_list(root, IncDict, tree_list, level=0):
+    rootDate = get_timestamp(root)
+    SpaceLength = 150 - 3*level - len(root)
+#    print(IncDict)
+    subs = IncDict[root]
+    subs.sort(key=lambda x: x[0])
+    if level > 0:
+        trunk1 = ' +- '
+    else:
+        trunk1 = ''
+    trunk2 = ' |  ' * (level-1)
+    trunk = trunk2+trunk1+root
+    tree_list.append(trunk)
+    for s in subs:
+        if s in IncDict:
+            print_tree_to_list(s, IncDict, tree_list, level + 1)
+        else:
+            sDate = get_timestamp(s)
+            lvl = level + 1
+            SpaceLength = 150 - 3*lvl - len(s)
+            branch1 = ' +- '
+            branch2 = ' |  ' * (lvl - 1)
+            branch = branch2+branch1+s
+            tree_list.append(branch)
+#            print("   "*lvl, s, " "*SpaceLength, sDate)
+    return tree_list
+ 
+# ---------- User input how to visualize the tree structure with loop-----------        
+def user_choose_long_or_short_tree_loop(inp, include_list_total, include_list_total_short):
     if len(include_list_total) < 1:
         print('\nNo nested files found')
         quit()
@@ -245,22 +295,43 @@ def user_choose_long_or_short_tree(inp, include_list_total, include_list_total_s
     print('')
     ans = input("Display tree structure long or short? [l/s]: ")
     print('')
+    tree_list = []
     if ans == 'l':
         IncDict = get_dict_parent_children(include_list_total)
         root = inp[1]
 #        print('\n')
-        print_tree(root, IncDict, level=0)
-        user_choose_long_or_short_tree(inp, include_list_total, include_list_total_short)
+        print_tree(root, IncDict, tree_list, level=0)
+        user_choose_long_or_short_tree_loop(inp, include_list_total, include_list_total_short)
     elif ans == 's':
         IncDict = get_dict_parent_children(include_list_total_short)
         inpl = [inp]
         inpls = shortname(inpl)
         root = inpls[0][0]
 #        print('\n')
-        print_tree(root, IncDict, level=0)
-        user_choose_long_or_short_tree(inp, include_list_total, include_list_total_short)
+        print_tree(root, IncDict, tree_list, level=0)
+        user_choose_long_or_short_tree_loop(inp, include_list_total, include_list_total_short)
     else:
-        pass    
+        pass
+    return tree_list
+# ---------- User input how to visualize the tree structure -----------
+def user_choose_long_or_short_tree(inp, include_list_total, include_list_total_short, ans):
+    if len(include_list_total) < 1:
+        print('\nNo nested files found')
+        quit()
+    tree_list = []
+    if ans == 'l':
+        IncDict = get_dict_parent_children(include_list_total)
+        root = inp[1]
+        tree_list = print_tree_to_list(root, IncDict, tree_list, level=0)
+    elif ans == 's':
+        IncDict = get_dict_parent_children(include_list_total_short)
+        inpl = [inp]
+        inpls = shortname(inpl)
+        root = inpls[0][0]
+        tree_list = print_tree_to_list(root, IncDict, tree_list, level=0) 
+    else:
+        print('specify [l/s] for long or shor tree structure')
+    return tree_list
 # ---------- Search for a string in Includes -----------
 def string_search(args, include_list_total):
     if args.str_search:
@@ -273,21 +344,23 @@ def string_search(args, include_list_total):
         for item in simple_include_list:
             command = 'grep --color --with-filename '+str2search+' '+item
             os.system(command)
-        sys.exit()
+        return simple_include_list
     else:
         pass
-# ---------- Run -----------
-if __name__ == "__main__":
+# ---------- End script function under certain conditions -----------
+def end_script(args):
+    if args.str_search:
+        sys.exit()
+
+# ---------- Main single file -----------
+def main_single(inp, args, ans):
+#    inp, args = user_input()
     t = time.time()
-    inp, args = user_input()
     include_list = [inp]
-    include_list_total = []
-    Includes_cannot_read = []
-    Includes_not_exist = []
-    include_list_total = recur(include_list, Includes_not_exist, Includes_cannot_read, include_list_total)  
+    Includes_not_exist, Includes_cannot_read, include_list_total = recur(include_list, Includes_not_exist = [], Includes_cannot_read = [], include_list_total = [])  
     include_list_total.sort(key=lambda x: x[0])
-    string_search(args, include_list_total)
-# ---------- Terminal output: print the found nested files -----------
+#    simple_include_list = string_search(args, include_list_total)
+#    end_script(args)
 #    print('Final list:')
     include_list_total_short = shortname(include_list_total)
 #    [print('Include: '+f'{x[0]:<60}'+' referenced in: '+x[1]) for x in include_list_total]
@@ -295,12 +368,80 @@ if __name__ == "__main__":
     elapsed = round(elapsed, 2)
     print("\nDone. Time elapsed: " + str(elapsed) + " seconds")
     print("")
-    
-# ---------- List missing files -----------
+
     list_missing_files(Includes_not_exist, Includes_cannot_read)
+    tree_list = user_choose_long_or_short_tree(inp, include_list_total, include_list_total_short, ans)
+    if not args.compare_deck:
+        print(*tree_list, sep = '\n')
+    '''
+    if not args.compare_deck:
+        copy_files(include_list_total)
+    '''
+    return tree_list
     
-# ---------- Print tree structure -----------
-    user_choose_long_or_short_tree(inp, include_list_total, include_list_total_short)
-  
-# ---------- Copy the files (optional) -----------
-    copy_files(include_list_total)
+# ---------- Main compare 2 files-----------
+def main_compare(inp, args):
+    print('')
+    ans = input("Display tree structure long or short? [l/s]: ")
+    print('')
+    td = tempfile.TemporaryDirectory()
+    td_path = td.name
+    inp_1_and_father = inp
+    inp_2 = args.compare_deck
+    inp2tuple = inp_2, inp_2
+    inp2tuple_list = [inp2tuple]
+    inp2short = shortname(inp2tuple_list)
+    inp_2s = inp2short[0][0]
+    inp_2_father_file = os.path.abspath(inp_2)
+    inp_2_and_father = inp_2s, inp_2_father_file
+    list_1 = [inp_1_and_father]
+    list_2 = [inp_2_and_father]
+    title_1 = shortname(list_1)
+    title_2 = shortname(list_2)
+    t_1 = title_1[0][0]
+    t_2 = title_2[0][0]
+#    print(inp_1_and_father)
+#    print(inp_2_and_father)
+    tree_list_1 = main_single(inp_1_and_father, args, ans)
+    tree_list_2 = main_single(inp_2_and_father, args, ans)
+
+    with open(os.path.join(td_path, t_1), "w") as file1:
+        for item in tree_list_1:
+            file1.write(f"{item}\n")
+    with open(os.path.join(td_path, t_2), "w") as file2:
+        for item in tree_list_2:
+            file2.write(f"{item}\n")
+    command = 'xxdiff '+td_path+'/'+t_1+' '+td_path+'/'+t_2
+    print(command)
+    os.system(command) 
+    
+# ---------- Main search for a string -----------
+def main_search(inp, args):
+    t = time.time()
+    include_list = [inp]
+    Includes_not_exist, Includes_cannot_read, include_list_total = recur(include_list, Includes_not_exist = [], Includes_cannot_read = [], include_list_total = [])  
+    include_list_total.sort(key=lambda x: x[0])
+    simple_include_list = string_search(args, include_list_total)
+    elapsed = time.time() - t
+    elapsed = round(elapsed, 2)
+    print("\nDone. Time elapsed: " + str(elapsed) + " seconds")
+    print("")
+
+# ---------- Main -----------
+def main():
+    inp, args = user_input()
+    if args.str_search:
+        main_search(inp, args)
+    elif args.compare_deck:
+        main_compare(inp, args)
+    elif args.input_deck:
+        print('')
+        ans = input("Display tree structure long or short? [l/s]: ")
+        print('')
+        main_single(inp, args, ans)
+    else:
+        print("enter arguments (-i, -s, -c)")
+
+# ---------- Run -----------
+if __name__ == "__main__":
+    main()
