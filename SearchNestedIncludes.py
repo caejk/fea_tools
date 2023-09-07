@@ -38,10 +38,21 @@ def user_input():
         inp1 = args.input_deck
         inp2 = args.compare_deck
         input_raw = args.input_deck
-
-    else:
+    if args.input_deck is None:
+        usage="Usage:  \033[1mShow Deck's all subincludes:\033[0m\n\
+        /share/tools/akka_tools/akka/bin/sagmirwodieincludessind.py -i Input.inp\n\
+        \n\
+        \033[1mSearch a string in deck's all subincludes:\033[0m\n\
+        /share/tools/akka_tools/akka/bin/sagmirwodieincludessind.py -i Input.inp -s string\n\
+        \n\
+        \033[1mCompare subincludes of two decks:\033[0m\n\
+        /share/tools/akka_tools/akka/bin/sagmirwodieincludessind.py -i Input1.inp -c Input2.inp\n\
+        \n\
+        Display tree structure long or short [l/s]:\n\
+        l = show absolute paths\n\
+        s = show only include names"
         print("")
-        print("Enter an input deck to scan")
+        print(usage)
         sys.exit()
         
     if args.str_search:
@@ -131,7 +142,8 @@ def scan_for_includes(inp_and_father, Includes_not_exist, Includes_cannot_read):
 def recur(include_list, Includes_not_exist, Includes_cannot_read, include_list_total):
     subinclude_list = []
     subinclude_list_all = []
-    print('Scanning '+str(len(include_list))+' nested files...')
+    if len(include_list) > 1:
+        print('Scanning '+str(len(include_list))+' nested files...')
     for inp in include_list: 
         subinclude_list, Includes_not_exist, Includes_cannot_read = scan_for_includes(inp, Includes_not_exist, Includes_cannot_read)
         subinclude_list_all.extend(subinclude_list)
@@ -357,6 +369,7 @@ def main_single(inp, args, ans):
 #    inp, args = user_input()
     t = time.time()
     include_list = [inp]
+    print('Scanning '+'\033[1m'+inp[0]+'\033[0m')
     Includes_not_exist, Includes_cannot_read, include_list_total = recur(include_list, Includes_not_exist = [], Includes_cannot_read = [], include_list_total = [])  
     include_list_total.sort(key=lambda x: x[0])
 #    simple_include_list = string_search(args, include_list_total)
