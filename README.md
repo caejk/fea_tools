@@ -8,6 +8,12 @@ SearchNestedIncludes.py
   - The script is to be called with the main solver input deck as an argument.
   - The script produces terminal output with absolute paths to all found includes.
   - The user can choose whether he wishes to copy all found files to a specific directory.
+
+Result_Checker.py
+ - Script for checking LS-Dyna simulation results:
+ - checks all subfolders of current working directory for results
+ - search filtering through string patterns, user etc.
+ - can load filtered simulations into Animator
   
 Excel2Impact.py
   - This script will help you in comparing your FEA simulation with real world crash test.
