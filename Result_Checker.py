@@ -18,6 +18,28 @@ TWHITE = '\033[37m'
 TGREEN = '\033[32m'  # Green Text
 TORANGE = '\033[33m'  # orange text
 
+Help = """Dispose Check Help:
+
+Parameters:
+
+-u,     only runs by the user logged into the shell
+-u=username,    only runs by specified user(s)
+-ignore=string,     ignores runs containing "string"
+-a4,    opens selected runs in Animator
+
+Multiple search patterns can be specified using AND, OR logic:
+Space = OR, / = AND
+
+Example:
+
+dispose_check.py -u -u=user1 -u=user2 v001/fh v002/fd -ignore=test -a4
+
+Selects runs that:
+ - have "v001" and "fh" or "v002" and "fd" in their name
+ - are owned by users: "user1", "user2" or the user themselves
+ - do not have the word "test" in the name
+ - runs will be opened in animator"""
+
 def GetCogX(run):
     command = 'grep -s -A3 "t o t a l" ' + run + '/d3hsp' + ' | grep -s "x-coordinate of mass center" | cut -d "=" -f 2'
     CogX = subprocess.check_output(command, shell=True, universal_newlines=True).strip()
@@ -26,6 +48,7 @@ def GetCogX(run):
         CogX = format(CogX, '.0f')
         CogX = str(CogX) + " mm"
     except:
+        #        print("no COG")
         CogX = "       "
     return CogX
 
@@ -84,8 +107,10 @@ def GetMass(run):
             MassLF = '   '
     try:
         TotalMass = MassPhys + MassLF
+        #        TotalMass = float(TotalMass)
         TotalMass = format(TotalMass, '.1f')
         TotalMass = str(TotalMass)
+    #        print(TotalMass)
     except:
         MassPhys = ''
         MassLF = ''
@@ -114,10 +139,21 @@ def GetOLC(run):
     return OLC_value
 
 
-def RunFilter(DirPattern):
+def RunFilter(DirPattern, IgnorePattern):
     t1 = time.time()
     DirList = next(os.walk('.'))[1]
-    ListOfRunsReduced = [x for x in DirList if any(p in x for p in DirPattern)]
+    #    print(str(len(DirList)), ' runs found')
+    if any('/' in x for x in DirPattern):  # Create list of lists of patterns if "/" wildcard is invoked
+        AndPatterns = [p.split('/') for p in DirPattern]
+        #        print(AndOrPatterns)
+        ListOfRunsReduced_ = []
+        for AndPattern in AndPatterns:
+            ListOfRunsOfCurrentAndPattern = [x for x in DirList if all(p in x for p in AndPattern)]
+            ListOfRunsReduced_.extend(ListOfRunsOfCurrentAndPattern)
+    else:
+        ListOfRunsReduced_ = [x for x in DirList if any(p in x for p in DirPattern)]
+
+    ListOfRunsReduced = [x for x in ListOfRunsReduced_ if not any(i in x for i in IgnorePattern)]  # 1st round of filtering according to ignore pattern
     ListOfRunsReduced.sort(key=os.path.getctime)
     print('{:3s}'.format(str(len(ListOfRunsReduced))), 'folders match pattern')
     ListOfRunsReducedByPattern = []  # In this list the subfolder containing the d3hsp will be saved
@@ -175,7 +211,20 @@ def RunFilter(DirPattern):
         quit()
     else:
         print('{:3s}'.format(str(len(ListOfRunsReducedByPattern))), 'folders contain d3hsp file')
-    return ListOfRunsReducedByPattern
+        ListOfRunsReducedByPatternAndIgnore = [x for x in ListOfRunsReducedByPattern if not any(i in x for i in IgnorePattern)] # 2nd round of filtering according to ignore pattern, this time considering subfolders
+        ListOfRunsReducedByPatternAndIgnore.sort(key=os.path.getctime)
+        LenBeforeIgnore = len(ListOfRunsReducedByPattern)
+        LenAfterIgnore = len(ListOfRunsReducedByPatternAndIgnore)
+        NrOfIgnored = LenBeforeIgnore - LenAfterIgnore
+        if NrOfIgnored > 0:
+            print('{:3s}'.format(str(NrOfIgnored)),
+                  'folders with a subfolder containing the ignore pattern have been ignored')
+        else:
+            if len(ListOfRunsReducedByPatternAndIgnore) == 0:
+                quit()
+            else:
+                pass
+        return ListOfRunsReducedByPatternAndIgnore
 
 
 def FilterByOwner(filter_by_owner, OwnersToConsider, ListOfRunsReducedByPattern):
@@ -192,37 +241,52 @@ def FilterByOwner(filter_by_owner, OwnersToConsider, ListOfRunsReducedByPattern)
 
 
 def analyse_user_input():
-    KeyWords = ['-u', '-a4', '-u=']
+    KeyWords = ['-u', '-a4', '-u=', '-ignore=', '-h']
+    filter_by_owner = False
+    OwnersToConsider = []
     user_args = sys.argv
     user_args_noPyFile = user_args[1:]
     user_args_noPyFile_noKeyWords = [i for i in user_args_noPyFile if not any(k in i for k in KeyWords)]
-    OwnersToConsider = []
-    filter_by_owner = False
-  
+
+    if any('-h' == arg for arg in user_args):
+        print(Help)
+        quit()
     if len(user_args_noPyFile_noKeyWords) == 0:
-        DirPattern = ['']
+        DirPattern=['']
     else:
         DirPattern = user_args_noPyFile_noKeyWords
+    if any('-ignore=' in arg for arg in user_args):
+        IgnorePattern = [i.replace('-ignore=', '') for i in user_args if '-ignore=' in i]
+    else:
+        IgnorePattern = []
+
     if any('-a4' == arg for arg in user_args):
         open_animator = True
     else:
         open_animator = False
+
     if any('-u' == arg for arg in user_args):
         OwnersToConsider.append(os.getlogin())
         filter_by_owner = True
+
     if any('-u=' in arg for arg in user_args):
         owners = [u.replace('-u=', '') for u in user_args if '-u=' in u]
         OwnersToConsider.extend(owners)
         OwnersToConsider = list(set(OwnersToConsider))
         filter_by_owner = True
-
+#        print('sort by another owner(s):' )
+#        print(owners)
     if OwnersToConsider != []:
+#        print(str(len(OwnersToConsider)), ' owner(s) will be considered:', *OwnersToConsider, sep=' ')
         print('{:3s}'.format(str(len(OwnersToConsider))), 'owner(s) will be considered:', *OwnersToConsider, sep=' ')
-    return DirPattern, OwnersToConsider, filter_by_owner, open_animator
+#    print(OwnersToConsider)
+    return DirPattern, OwnersToConsider, filter_by_owner, open_animator, IgnorePattern
 
 def MainOutput():
     t = time.time()
     MaxLenOfRunName = len((max(ListOfRunsReduced, key=len)))
+    HeaderSpacer1 = ' ' * 27
+    # LenOfSpacer2 = MaxLenOfRunName - 8 - len(DispDir)
     LenOfSpacer2 = MaxLenOfRunName
     HeaderSpacer2 = ' ' * LenOfSpacer2
 
@@ -233,7 +297,9 @@ def MainOutput():
     times_term = []
     times_mass = []
 
-    print('{:8s} {:17s} {:100} {:8} {:10} {:10} {:8} {:8}'.format("Owner", "Date", "Run Name", "Mass", "COG(x)", "Termin.", "Time", "OLC"))
+    print('{:8s} {:17s} {:100} {:8} {:10} {:10} {:8} {:8}'.format("Owner", "Date", "Run Name", "Mass", "COG(x)", "Termin.",
+                                                              "Time", "OLC"))
+
     PlotList = []
 
     for r in ListOfRunsReduced:
@@ -277,7 +343,10 @@ def MainOutput():
 
         NameOffset = MaxLenOfRunName - len(r)
         RunName += ' ' * NameOffset
+
+        #    try:
         EndTimeList = EndTime.split(' ')
+        #    print(EndTimeList[0])
         EndTimeValueString = EndTimeList[0]
         EndTimeValueString = EndTimeValueString.strip(' ')
 
@@ -296,7 +365,10 @@ def MainOutput():
         else:
             RunShortName = RunName
 
-        print('{:8s} {:17s} {:110} {:8} {:20} {:20} {:8} {:6}'.format(RunOwner, RunDate, TBLUE + RunShortName + TWHITE, RunMass, TRED + RunCogX + TWHITE, RunTermStatus, EndTime, OLC_value))
+        print('{:8s} {:17s} {:110} {:8} {:20} {:20} {:8} {:6}'.format(RunOwner, RunDate, TBLUE + RunShortName + TWHITE,
+                                                                      RunMass, TRED + RunCogX + TWHITE, RunTermStatus,
+                                                                      EndTime, OLC_value))
+
         d3plot_path = os.path.abspath(r + '/d3plot')
         PlotList.append(d3plot_path)
 
@@ -345,11 +417,11 @@ if __name__ == "__main__":
 # ----------------------
 # Analyse user input
 # ----------------------
-    DirPattern, OwnersToConsider, filter_by_owner, open_animator = analyse_user_input()
+    DirPattern, OwnersToConsider, filter_by_owner, open_animator, IgnorePattern = analyse_user_input()
 # --------------------------
 # Filter Runs by Pattern
 # --------------------------
-    ListOfRunsReducedByPattern = RunFilter(DirPattern)
+    ListOfRunsReducedByPattern = RunFilter(DirPattern, IgnorePattern)
 # --------------------------
 # Filter Runs by Owner
 # --------------------------
